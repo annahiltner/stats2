@@ -1,0 +1,189 @@
+---
+title: "Week 1 Homework"
+author: "Anna Hiltner Nouzeilles"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(broom)
+
+set.seed(1)
+
+d <- readRDS("nyc_marathon.rds")
+```
+
+# Probability
+
+## Marginal Probability
+
+The *marginal probability* of a runner being Kenyan is 0.023%
+
+$$
+P(\text{Kenya}) = \frac{4+9}{3 + 4 + 3 + 38000+ 9 + 18000} = .00023
+$$
+
+The *marginal probability* of a runner being American is 67.9%
+
+$$
+P(\text{USA}) = \frac{3 + 38000}{3 + 4 + 3 + 38000+ 9 + 18000} = 0.6786
+$$
+
+## Joint probability
+
+The *joint probability* of being Kenyan and ending up in the top 10 $P(\text{Kenya} \cap \text{Top10})$ is about 0.0071%
+
+$$
+P(\text{Kenya} \cap \text{Top10}) = \frac{4}{3 + 4 + 3 + 38000+ 9 + 18000} = 0.0000714 
+$$
+
+The *joint probability* of being Kenyan and ending up outside the top 10 $P(\text{Kenya} \cap \text{NotTop 10})$ is about 0.0161%
+
+$$P(\text{Kenya} \cap \text{NotTop10}) = \frac{9}{3 + 4 + 3 + 38000+ 9 + 18000} = 0.000161
+$$
+
+## Conditional Probability
+
+The *conditional probability* of being in the top 10 given that a runner is Kenyan is about 30.8%
+
+$$
+P(\text{Top10} | \text{Kenyan}) = \frac{\tfrac{4}{56019}}{\tfrac{13}{56019}} = 0.3077 
+$$
+
+The *conditional probability* of being Kenyan given that a runner is in the top 10 is about 40%
+
+$$
+P(\text{Kenyan} | \text{Top10}) = \frac{\tfrac{4}{56019}}{\tfrac{10}{56019}} = .4
+$$
+
+If we wanted to compare the performance of US and Kenyan runner using conditional probabilities, we would look at the conditional probability of being in the top 10 give that the runner is Kenyan or American because it accounts for the number of runners each country sends and measures how likely it is that a runner from each country makes it into the top 10.
+
+# Regression Review
+
+## (a) NYC Marathon Finishing Times
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+ggplot(d, aes(x = time)) +
+  geom_histogram(binwidth = 30, fill = "steelblue")
+```
+
+The distribution of finishing times is slightly right skewed (because of outliers with longer times) with a peak at 4 hours. The sharp rises suggest that runners tend to cluster around common finishing time goals such as 3, 3.5, 4, 4.5 hours. They train to finish the race at specific times and the race reflects that because people adjust their pace to finish by their goal.
+
+## Random Sample
+
+**(b)**
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+set.seed(1)
+sample <- d |>
+  slice_sample(n = 500)
+
+ggplot(sample,
+       aes(x = age, y = time)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    x = "Runner Age",
+    y = "Finishing Time"
+    ) +
+  theme_minimal()
+  
+  
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+sample <- sample |> 
+  mutate(timemin = as.numeric(time) / 60) 
+
+mod_1 <- lm(timemin ~ age, 
+            data = sample)
+
+summary(mod_1)
+```
+
+**(c)** The intercept of 226.7 tells us the predicted finishing time in minutes when age = 0. Even though this is not useful since nobody at age zero runs a marathon, it tells us where the regression line crosses the y-axis and can be used to predict the finishing times for other ages. The age coefficient of 1.1 tells us that for each additional year of age, finishing time increases by about 1.1 minutes in this sample.
+
+**(d)** Given the following equation, the predicted finishing time for a runner who is 5, 20, 50, and 110 years old would be about 232, 246, 277, and 337 minutes respectively.
+
+$$
+\hat{time} = \beta_{0} + \beta_{1} \cdot age
+$$
+
+$$
+\hat{time} = 227 + 1 \cdot age
+$$
+
+## (e) Two Regressions
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+set.seed(1)
+
+ggplot(sample,
+       aes(x = age, y = time)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "red", data = sample) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue", data = d) +
+  ylim(10000, 28800) +
+  labs(
+    x = "Runner Age",
+    y = "Finishing Time (seconds)",
+    title = "Comparing Regressions of All Runners and Sample"
+    ) +
+  theme_minimal()
+```
+
+The two regression lines differ slightly. The [red]{style="color: red;"} line shows the regression for the random sample of 500 while the [blue]{style="color: blue;"} line shows the regression for all of the data. In the random sample, the line is steeper which means the effect of age on finishing time is slightly overestimated compared to the full dataset. Taking a larger sample from the population would make the lines more similar.
+
+## (f) Repeated Samples
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(tidyverse)
+
+set.seed(1)
+
+repeated_samples <- tibble(samp_id = 1:2000) |>
+  mutate(sample = map(samp_id, ~ d |> slice_sample(n = 500, replace = TRUE)))
+
+samples_coef <- repeated_samples |>
+  transmute(
+    samp_id,
+    age_coef = map_dbl(sample, ~ coef(lm(time_seconds ~ age, data = .x))["age"])
+  )
+
+data_coef <- coef(lm(time_seconds ~ age, data = d))["age"]
+
+ggplot(samples_coef, aes(x = age_coef)) +
+  geom_histogram(bins = 60, fill = "darkgreen", color = "black") +
+  geom_vline(xintercept = data_coef, color = "red", linewidth = 1.2) +
+  labs(
+    title = "Sampling Distribution of Age Coefficient",
+    x = "Age Coefficient",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+```
+
+As an example of the Central Limit Theorem, the estimated coefficients from the 2000 samples of n=500 create a normal distribution with the age coefficient of the whole sample at its center.
