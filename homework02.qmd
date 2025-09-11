@@ -1,0 +1,232 @@
+---
+title: "Week 2 Homework"
+author: "Anna Hiltner Nouzeilles"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(broom)
+
+set.seed(1)
+```
+
+## 1. Simulated Dataset
+
+```{r}
+n <- 100
+delta <- 5
+b0 <- 10
+b1 <- 1.1
+
+d <- tibble( #creating data frame
+  id = 1:n, #creates student IDs from 1-100
+  x = rnorm(n, 65, 3), #quiz 1 scores 
+  u0 = rnorm(n, 0, 1), 
+  u1 = rnorm(n, 0, 1), #error terms
+  y0 = b0 + b1*x + u0, #potential outcomes of control
+  y1 = b0 + b1*x + delta + u1, #potential outcomes of treated
+  t = sample(rep(0:1, 50), replace = FALSE), #randomly assigns 50 students to control and 50 to treatment
+  y = if_else(t == 1, y1, y0)) #assigns y1 for treated, y0 for control
+
+```
+
+## 2. Interpretation
+
+### a.
+
+$\delta$ is the average treatment effect (ATE), which means that the students that get the treatment have scores on the second quiz that are 5 points higher compared to the students that do not receive the treatment.
+
+### b.
+
+The intercept B0 = 10 means that if a student got a zero on the first quiz, a student is expected to get a 10 on the second quiz. The intercept is the baseline or starting point before incorporating error or delta into the model.
+
+### c. 
+
+B1 = 1.1 means that for each unit/point increase in quiz 1, we expect quiz 2 scores to increase by 1.1 points.
+
+## 3. True SATE, Estimated SATE, Regressions, and Simulations
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+
+#a True SATE
+sate <- d |> 
+  summarize(sate = mean(y1 - y0)) |>  #uses potential outcomes
+  pull()
+```
+
+### a.
+
+The true SATE is 4.92 which is very similar to the ATE of 5. The difference comes from the errors u1 and u0.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+
+#b Estimated SATE
+sate_hat <- d |> 
+  group_by(t) |> 
+  mutate(t = paste0("t", t)) |> 
+  summarise(mean = mean(y)) |> 
+  pivot_wider(names_from = t, values_from = mean) |> 
+  mutate(sate_hat = t1 - t0) #`1` - `0`
+  
+print(sate_hat) 
+
+```
+
+### b.
+
+The estimated $\widehat{SATE}$ is 4.06 which is the difference in outcomes between the treatment and control groups. The true SATE is closer to 5 because the treatment effect is constant for each student. The estimated $\widehat{SATE}$ is close to delta but farther off because of the small sample size. In the estimated $\widehat{SATE}$, students' baseline scores differ which shifts the SATE away from delta.
+
+### c.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+
+sate_hats <- c()
+for(i in 1:500) {
+  
+  sate_hats[i] <- 
+    d |> 
+    mutate(t = sample(t, replace = FALSE),
+           y = if_else(t == 1, y1, y0)) |> 
+  group_by(t) |> 
+  mutate(t = paste0("t", t)) |> 
+  summarise(mean = mean(y)) |> 
+  pivot_wider(names_from = t, values_from = mean) |> 
+  mutate(sate_hat = t1 - t0) |> 
+  pull(sate_hat)
+}
+
+mean_sate <- mean(sate_hats)
+sd_sate <- sd(sate_hats)
+
+
+
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+
+sate_hats_df <- tibble(sate_hats = sate_hats)
+
+sate_hats_plot <- sate_hats_df |> 
+  ggplot(aes(x = sate_hats)) +
+  geom_histogram(bins = 40, fill = "darkgreen") +
+  geom_vline(xintercept = mean(sate_hats_df$sate_hats), linewidth = 1, color = "blue") +
+  geom_vline(xintercept = delta, linewidth = 1, linetype = "dashed", color = "red") +
+  labs(title = "Distribution of Simulated SATEs",
+       subtitle = "500 Samples using Difference in Means",
+       x = "Estimated SATE",
+       y = "Count")
+
+sate_hats_plot
+
+print(paste0(mean(sate_hats_df$sate_hats)))
+print(paste0(sd(sate_hats_df$sate_hats)))
+
+```
+
+The mean of this distribution is 4.87 and the standard of deviation is 0.73.
+
+### d. 
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+
+reg1 <- lm(y ~ t, data = d)
+
+tidy(reg1)
+
+reg2 <- lm(y ~ t + x, data = d)
+
+tidy(reg2)
+```
+
+The second regression that includes x, or Quiz 1, is closer to SATE and $\delta$ than the first regression that does not include x.
+
+### e. 
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+
+sate_hats_lm <- c()
+for(i in 1:500) {
+  
+  sate_hats_lm[i] <- 
+    d |> 
+    mutate(t = sample(t, replace = FALSE),
+           y = if_else(t == 1, y1, y0)) |> 
+  summarise(sate_hat = {
+    tidy(lm(y ~ t + x, data = cur_data())) |> 
+    filter(term == "t") |> 
+    pull(estimate)
+  }) |> 
+  pull(sate_hat)
+}
+
+mean_sate_lm <- mean(sate_hats_lm)
+sd_sate_lm <- sd(sate_hats_lm)
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+
+sate_hats_lm_df <- tibble(sate_hats_lm = sate_hats_lm)
+
+sate_hats_lm_plot <- sate_hats_lm_df |> 
+  ggplot(aes(x = sate_hats_lm)) +
+  geom_histogram(bins = 40, fill = "lightblue") +
+  geom_vline(xintercept = mean(sate_hats_lm_df$sate_hats_lm), linewidth = 1, color = "blue") +
+  geom_vline(xintercept = delta, linewidth = 1, linetype = "dashed", color = "red") +
+  labs(title = "Distribution of Simulated SATEs",
+       subtitle = "500 Samples using Regression",
+       x = "Estimated SATE",
+       y = "Count")
+
+sate_hats_lm_plot
+
+```
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+
+tibble(
+  method = c("Difference in Means", "Regression (y ~ t + x)"),
+  mean   = c(mean(sate_hats),     mean(sate_hats_lm)),
+  sd     = c(sd(sate_hats),       sd(sate_hats_lm))
+)
+```
+
+This distribution is different from the difference in means distribution in that it is narrower, with a smaller standard of distribution that creates a spread from about 4.5 to 5.3 instead of about 3 to 7. The second method using the regression is more reliable because it uses the scores from quiz 1.
