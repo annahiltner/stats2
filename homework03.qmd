@@ -1,0 +1,264 @@
+---
+title: "Homework 3"
+author: "Anna Hiltner Nouzeilles"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(MatchIt)
+library(hrbrthemes)
+library(broom)
+library(cobalt)
+theme_set(theme_ipsum())
+```
+
+## 1.
+
+#### a.
+
+Weights for the left, ambidextrous, and right-handed people in the control group will be 1, 1, 1.
+
+#### b.
+
+We want the treated group to match the control group's proportions of 10% left, 2% ambidextrous, and 88% right. Weights for treated group are therefore:
+
+Left: 10/6 = 1.67
+
+Amb: 2/4 = 0.5
+
+Right: 88/90 = 0.978
+
+#### c.
+
+Calculations of treated group proportions:
+
+6\*1.67 = 10
+
+4\*0.5 = 2
+
+90\*0.978 = 88
+
+#### d.
+
+Weighted average penmanship score in the treated group:
+
+(10\*7 + 2\*4 + 88\*6) / 100 = 6.06
+
+## 2.
+
+#### a.
+
+Selecting multiple control matches produces more bias because the more matches one has for each treated observation, the worse the matches get. It will include some observations in the control group that aren't as close to the treated group, which makes claiming that we've closed the back doors more difficult.
+
+#### b.
+
+Using a relatively wide bandwidth will produce more bias because it allows more bad matches
+
+#### c.
+
+Selecting matches without replacement will produce more bias but less variance because if two treated units share the same best control, without replacement would force one to take a worse match. However, if we use matching with replacement, some control observations will be used repeatedly and have more influence on the mean which increases variance.
+
+#### d.
+
+Selecting one control match for each treatment will produce more bias because if that one match is poor, there is nothing to correct the difference.
+
+## 3.
+
+According to the curse of dimensionality, the more matching variables you add, the less likely you are to find a good match for any given treated observation. Exact matching or coarsened exact matching should generally be reserved for very large samples or situations where a very small number of matching variables is appropriate because otherwise the curse of dimensionality would make it impossible to find matches and most treated units would not find an exact control match which results in a lot of dropped observations. It also can result in a poor representation of the ATE if certain kinds of treated observations are more likely to find matches than others.
+
+## 4.
+
+\(d\) is the answer because when one is using propensity scores, they are fitting a model which risks misspecification. Exact matching and distance matching do not require correct model specifications. (a) is false because you can combine exact matching and propensity score. (b) is not a downside. (c) is false because propensity scores do the opposite.
+
+## 5.
+
+#### a.
+
+The matching process assumes that there are control observations for treatment observations to match with. But for retail businesses with 1-5 employees, there are no untreated observations that exist and therefore no common support.
+
+#### b.
+
+No. The common support assumption is about finding controls for treated observations.
+
+#### c.
+
+The concern here is that the 5 treated businesses will all only be compared against the single untreated business. Common support here exists but is weak and has higher variance.
+
+#### d.
+
+In this case, we would not be estimating the ATT for all treated businesses but only for the businesses that have controls.
+
+## 6.
+
+By selecting untreated observations to look like the treated observations, one is estimating what the treated group's outcomes would have been without treatment which is the ATT. By selecting treated observations to look like the untreated observations, one is estimating what the untreated groups outcomes would have been if they had been treated which is the ATC.
+
+# Problem Set Part 2: Coding
+
+## 1. Loading the nsw_mixtape data
+
+```{r}
+d <- readRDS("/Users/annahiltner/Desktop/stats2/stats2/nsw_mixtape.rds")
+
+
+```
+
+## 2.
+
+#### a.
+
+```{r}
+d <- d |> mutate(weight = 1)
+```
+
+#### b.
+
+```{r}
+mod1 <- lm(re78 ~ treat,
+            data = d,
+            weights = weight)
+
+summary(mod1)
+```
+
+#### c.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+xvars <- c("age","educ","black","hisp","marr","nodegree","re74","re75")
+
+tbl_bal <- 
+  d |> 
+  select(treat, weight, all_of(xvars)) |> 
+  pivot_longer(all_of(xvars), names_to = "xvars", values_to = "value") |> 
+  group_by(treat, xvars) |> 
+  summarise(wmean = weighted.mean(value, w = weight)) |> 
+  pivot_wider(names_from = treat, values_from = wmean) 
+
+print(tbl_bal)
+```
+
+#### d.
+
+Some variables are well balanced such as age, black, and educ. However, even though the treatment was randomly assigned, the balance table shows some notable differences such as the 265 difference in 1975 earnings.
+
+## 3.
+
+#### a.
+
+```{r}
+m_match <- matchit(treat ~ age + educ + black + hisp + marr + nodegree + re74 + re75,
+                   data = d,
+                   method = "nearest",
+                   replace = TRUE,
+                   distance = "mahalanobis",
+                   ratio = 3,
+                   caliper = NULL)
+
+summary(m_match)
+
+```
+
+#### b.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+#Table
+md <- match.data(m_match)
+
+pmtbl <- bal.tab(m_match)
+print(pmtbl)
+
+#Love Plot
+pmtlp <- love.plot(m_match, 
+          threshold = .1,
+          abs = TRUE,
+          binary = "std",
+          continuous = "std",
+          var.order = "unadjusted",
+          drop.distance = TRUE)
+
+print(pmtlp)
+```
+
+#### c.
+
+```{r}
+m_att <- lm(re78 ~ treat,
+            data = md,
+            weights = weight)
+
+summary(m_att)
+```
+
+The ATT is 1831.2
+
+## 4.
+
+#### a.
+
+```{r}
+mod2 <- glm(treat ~ age + educ + black + hisp + marr + nodegree + re74 + re75,
+            data = d,
+            family = binomial(link = "logit"))
+
+d <- d |> 
+  mutate(propensity = predict(mod2, type = "response"))
+
+```
+
+#### b.
+
+```{r}
+d <- d |> 
+  mutate(ipw = case_when(
+    treat == 1 ~ 1/propensity,
+    treat == 0 ~ 1/(1-propensity)))
+  
+```
+
+#### c.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+
+cs <- d |> 
+  ggplot(aes(x = propensity, fill = factor(treat))) +
+  geom_histogram(bins = 30) +
+  labs(
+    title = "Treated and Untreated Propensity Scores",
+    x = "Propensity Score",
+    y = "Count",
+    fill = "Treatment"
+  )
+
+print(cs)
+```
+
+There is good overlap around 0.33 to 0.45 of treated and controls. Otherwise, controls dominate at the low end while treated dominate at the high end.
+
+#### d.
+
+```{r}
+mod3 <- lm(re78 ~ treat, 
+           data = d,
+           weights = ipw)
+
+summary(mod3)
+```
