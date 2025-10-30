@@ -1,0 +1,292 @@
+---
+title: "Homework 4"
+author: "Anna Hiltner Nouzeilles"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(fixest)
+library(tidyverse)
+
+```
+
+# Problem Set Part 1
+
+# 1.
+
+## a. 
+
+9 = 2 + 3\*2 + ε
+
+ε = 1
+
+1 is the error, or the gap from the true model
+
+## b.
+
+9 = 1.9 + 3.1\*2 = 0.9
+
+0.9 is the residual, or the gap from the fitted line
+
+# 2.
+
+## top left
+
+$Y = \beta_0 + \beta_1 X + \beta_2 D + \varepsilon$
+
+or
+
+Y \~ X + D
+
+## top right
+
+$Y = \beta_0 + \beta_1 X + \varepsilon$
+
+or
+
+Y \~ X
+
+## bottom left
+
+$Y = \beta_0 + \beta_1 X + \varepsilon$
+
+or
+
+Y \~ X
+
+## bottom right
+
+Not possible because we would need to include A in the regression but A is unobserved.
+
+# 3.
+
+## a. 
+
+76.185 hours
+
+## b.
+
+19.693
+
+## c.
+
+The intercept for model 3: 306.553
+
+## d.
+
+1256.671 - 2\*238.853 = 778.965 hours
+
+## e.
+
+For the result to be statistically significant at the 95% level, we need t to be below -1.96 or above 1.96.
+
+$$
+t = \frac{\hat{\beta}_1}{SE(\hat{\beta}_1)}
+$$
+
+We use the t-statistic instead of the z-score because it is sample-based.
+
+### Model 2:
+
+-238.853 / 19.693 = -12.13
+
+The coefficient is about 12.13 standard deviations away from zero.
+
+### Model 3:
+
+-251.181 / 19.28 = -13.03
+
+The coefficient is about 13.03 standard deviations away from zero.
+
+# 4. 
+
+$AnnualHoursWorked = \beta_0 + \beta_1 Edu + \beta_2 Edu^2$
+
+## a.
+
+A one-year increase in education is associated with a ( $\beta_1 + 2\beta_2 Edu$ )-unit change in annual hours worked. This is the marginal effect of education.
+
+## b.
+
+The marginal effect when education = 16 is 110.230 + 2\*-1.581 \* 16 = 59.638 hours per year. This is the slope of the regression curve at 16 years of education.
+
+## c.
+
+It is getting less positive because $\beta_2$ is less than zero.
+
+## d.
+
+Including a whole bunch of additional powers of education in this model could lead to overfitting that fits noise instead of a true relationship. This also makes it less generalizable.
+
+# 5.
+
+## a.
+
+The coefficient 50.174 means homeowners work 50.174 more hours per one-year increase than non-homeowners. 50.174 / 32.923 = 1.52, which means it is not statistically significant at 95% because it is less than 1.96.
+
+## b.
+
+-923.904 - (-773.412) = -150.492.
+
+People with 4 children under 5 work 150.492 less hours than those with 3 children under 5.
+
+## c.
+
+No because the table only gives each coefficient's SE. We could test it by running a joint F-test or Wald test.
+
+# 6.
+
+## a.
+
+Since the model has an interaction row, the slope of education depends on the homeowner row. For non-homeowners, the effect of education is 110.073 hours per year. For homeowners, the effect is 110.073-53.994=56.079 hours per year.
+
+## b.
+
+The Homeowner x Education coefficient is -53.994 which means that for every one-unit increase in education, homeowners work 53.994 hours less than non-homeowners.
+
+## c.
+
+In model 2, a one-year increase in education is associated with 100\*(exp(0.067) - 1) = 6.93% more hours worked.
+
+## d.
+
+A 1% change in X corresponds with a 0.01 change in log(x). Therefore, a 1% change in education changes hours worked by 832.347\*0.01 = 8.324 hours.
+
+## e.
+
+The sample size is smaller in model 2 because observations with zero hours worked cannot be logged and are dropped.
+
+# 7.
+
+\(b\) Autocorrelation occurs when error terms are correlated across time, such that knowing the error term in one period gives us some information about the error term in the next period.
+
+# 8. 
+
+\(b\) and (e)
+
+\(a\) is wrong because it looks at slope, not spread.
+
+\(c\) is wrong because we should only use variables included in the model.
+
+\(d\) is wrong because R\^2 just looks at how well X explain Y rather than the errors.
+
+# 9.
+
+The pollster can use weighting to make their estimates reflect the proportions of the population. They would first need to calculate each group's weight (population proportion / sample proportion) then apply the weights to the observations.
+
+# 10.
+
+A measurement error is classical if it is unrelated to the true value of the variable or other variables in the model. It is non-classical if it is correlated with the true value. (a) is the answer because the bias is systematic rather than random. (b) and (c) are classical measurement error.
+
+# Problem Set Part 2
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+d <- read_csv("dengue.csv")
+```
+
+# 1.
+
+```{r}
+m1 <- lm(NoYes ~ humid + temp,
+         data = d)
+
+summary(m1)
+```
+
+# 2.
+
+```{r}
+m2 <- glm(NoYes ~ humid + temp,
+         data = d,
+         family = binomial(link = "logit"))
+
+summary(m2)
+
+```
+
+```{r}
+p_hat <- predict(m2, type = "response")
+summary(p_hat)
+```
+
+0.4149\*(1-0.4149)=0.2429 is the predicted probability
+
+0.30474\*0.2429=0.0741
+
+0.03987\*0.2429=0.0097
+
+A unit increase of humidity is associated with a log odds increase in dengue of 0.30474. It increases the probability of having dengue by 7.4 percentage points on average.
+
+A unit increase of temperature is associated with a log odds increase in dengue of 0.03987. It increases the probability of having dengue by 1 percentage point on average.
+
+# 3.
+
+```{r}
+d <- d |> 
+  drop_na(humid)
+
+m3 <- lm(humid ~ temp,
+         data = d)
+summary(m3)
+
+d <- d |> 
+  mutate(res = m3$residuals)
+
+
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+ggplot(d, 
+       aes(x = temp,
+           y = res)) +
+  geom_point(alpha=.5) +
+  geom_smooth(method = "loess") +
+  labs(x = "Temperature",
+       y = "Residuals")
+
+```
+
+There is likely heteroskedasticity because the variance of the residuals increases as temperature increases.
+
+```{r}
+
+m4 <- feols(humid ~ temp,
+            data = d,
+            se = "hetero")
+summary(m4)
+summary(m3)
+```
+
+The standard error on temperature in model 4 is slightly higher than the one in model 3. Even though the difference is not large, it is consistent with heteroskedasticity.
+
+# 4.
+
+```{r}
+m5 <- feols(log(humid) ~ temp,
+            data = d,
+            se = "hetero")
+summary(m5)
+```
+
+(exp(0.056482)-1)\*100= 5.811
+
+A one-unit increase in temperature is associated with a 5.811% increase in humidity.
+
+# 5.
+
+The plot looks more curved than linear and the variance of residuals got larger at higher temperatures. Taking the log of humidity makes it more linear and reduces variance.
